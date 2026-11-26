@@ -1,6 +1,4 @@
-# NEXO · tu primer agente de IA
-
-Proyecto del módulo 5073 – Programación de Inteligencia Artificial (Tema 1, bloque de POO).
+# NEXO Conectado con un LLM
 
 ## 1. Cómo ejecutar el proyecto
 
