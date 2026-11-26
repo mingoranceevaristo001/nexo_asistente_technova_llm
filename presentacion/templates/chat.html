@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#212121">
+  <title>NEXO · Chat</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #212121;
+      color: #ececec;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: flex; }
+    button, textarea, select { font: inherit; }
+    button { color: inherit; cursor: pointer; }
+    .sidebar {
+      position: fixed; z-index: 10; top: 86px; bottom: 14px; left: 12px;
+      width: 236px; padding: 14px 12px;
+      background: #171717ed; border: 1px solid #ffffff1c; border-radius: 16px;
+      box-shadow: 0 12px 36px #0005; backdrop-filter: blur(14px);
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .floating-ui {
+      position: fixed; z-index: 20; top: 14px; left: 14px; right: 14px;
+      display: flex; justify-content: space-between; align-items: flex-start;
+      pointer-events: none;
+    }
+    .floating-ui > * { pointer-events: auto; }
+    .brand {
+      display: flex; align-items: center; gap: 12px; padding: 8px 14px 8px 8px;
+      font-size: 17px; font-weight: 650; border: 1px solid #ffffff1c;
+      border-radius: 18px; background: #171717eF; backdrop-filter: blur(14px);
+      box-shadow: 0 8px 28px #0005;
+    }
+    .floating-controls {
+      position: fixed; top: 14px; right: 14px;
+      display: flex; align-items: center; gap: 9px; padding: 7px;
+      border: 1px solid #ffffff1c; border-radius: 14px;
+      background: #171717eF; backdrop-filter: blur(14px);
+      box-shadow: 0 8px 28px #0005;
+    }
+    .new-chat {
+      width: 100%; padding: 11px 12px; text-align: left; border: 1px solid #444;
+      border-radius: 9px; background: transparent;
+    }
+    .new-chat:hover { background: #292929; }
+    .sidebar-label { padding: 0 8px; color: #999; font-size: 12px; }
+    .conversation-list {
+      display: flex; flex: 1 1 auto; flex-direction: column; gap: 4px;
+      min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+      margin: 0 -4px; padding: 0 4px; scrollbar-gutter: stable;
+      scrollbar-width: thin; scrollbar-color: #555 transparent;
+    }
+    .conversation-entry { display: flex; flex: 0 0 auto; align-items: flex-start; gap: 3px; }
+    .conversation-item {
+      flex: 1 1 0; min-width: 0; padding: 9px 10px; text-align: left;
+      border: 0; border-radius: 8px; background: transparent;
+      color: #c8c8c8; white-space: normal; overflow-wrap: anywhere; line-height: 1.4;
+    }
+    .conversation-item:hover, .conversation-item.active { background: #292929; color: #fff; }
+    .conversation-delete {
+      flex: 0 0 30px; width: 30px; height: 32px; margin-top: 3px;
+      border: 0; border-radius: 7px; background: transparent; color: #999;
+      opacity: .55; transition: background-color .15s ease, color .15s ease, opacity .15s ease;
+    }
+    .conversation-entry:hover .conversation-delete,
+    .conversation-entry:focus-within .conversation-delete { opacity: 1; }
+    .conversation-delete:hover, .conversation-delete:focus-visible {
+      outline: none; background: #482b2b; color: #ffb4a9;
+    }
+    .conversation-empty { padding: 4px 10px; color: #888; font-size: 12px; }
+    .sidebar-note { margin-top: auto; padding: 12px 8px; color: #999; font-size: 12px; line-height: 1.5; }
+    main { flex: 1; min-width: 0; margin-left: 260px; display: flex; flex-direction: column; }
+    .model-picker { position: relative; display: flex; align-items: center; gap: 6px; }
+    .model-select {
+      display: flex; min-width: 150px; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 8px 11px; background: #222; border: 1px solid #444;
+      border-radius: 8px; color: #ececec; cursor: pointer;
+      transition: background-color .18s ease, border-color .18s ease;
+    }
+    .model-select:hover { background: #292929; }
+    .model-select:focus, .model-select:focus-visible { outline: none; box-shadow: none; }
+    .model-chevron { color: #aaa; font-size: 12px; }
+    .model-options {
+      position: absolute; z-index: 30; top: calc(100% + 7px); right: 0;
+      display: flex; flex-direction: column; gap: 3px; min-width: 100%;
+      width: max-content; max-width: calc(100vw - 16px); padding: 5px;
+      background: #111; border: 1px solid #3b3b3b; border-radius: 10px;
+      box-shadow: 0 12px 32px #0009;
+    }
+    .model-options[hidden] { display: none; }
+    .model-option {
+      width: 100%; padding: 9px 11px; border: 0; border-radius: 6px;
+      background: transparent; color: #ddd; text-align: left; white-space: nowrap;
+      cursor: pointer; transition: background-color .15s ease, color .15s ease;
+    }
+    .model-option:hover, .model-option:focus, .model-option[aria-selected="true"] {
+      outline: none; background: #292929; color: #fff;
+    }
+    .model-native { display: none; }
+    .tools-button {
+      padding: 8px 11px; background: transparent; border: 1px solid #444;
+      border-radius: 8px; color: #ececec;
+    }
+    .tools-button:hover { background: #292929; }
+    dialog {
+      width: min(440px, calc(100vw - 32px)); padding: 0;
+      color: #ececec; background: #252525; border: 1px solid #444;
+      border-radius: 14px; box-shadow: 0 18px 60px #0009;
+    }
+    dialog::backdrop { background: #0009; }
+    .tools-dialog-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 20px; border-bottom: 1px solid #3c3c3c;
+    }
+    .tools-dialog-header h2 { margin: 0; font-size: 17px; }
+    .close-dialog {
+      width: 32px; height: 32px; border: 0; border-radius: 8px;
+      background: transparent; font-size: 20px;
+    }
+    .close-dialog:hover { background: #3a3a3a; }
+    #tools-list { list-style: none; margin: 0; padding: 8px 20px 20px; }
+    #tools-list li { padding: 12px 0; border-bottom: 1px solid #3c3c3c; line-height: 1.5; }
+    #tools-list li:last-child { border-bottom: 0; }
+    .tools-empty { color: #aaa; }
+    .mascot-bar {
+      position: fixed; top: 14px; left: 50%;
+      transform: translateX(-50%); min-height: 0; margin: 0; gap: 10px;
+    }
+    .robot-sprite-frame { position: relative; width: 104px; height: 76px; flex: 0 0 104px; }
+    .robot-sprite { display: block; width: 100%; height: 100%; object-fit: contain; }
+    .robot-status { display: flex; flex-direction: column; gap: 3px;}
+    .robot-name { font-size: 18px; font-weight: 650; }
+    .robot-state { color: #aaa; font-size: 13px; }
+    .mascot-bar.is-active .robot-state { color: #8edbc7; }
+    @media (prefers-reduced-motion: reduce) {
+      .model-select, .model-option, .conversation-delete { transition: none; }
+    }
+    #messages {
+      width: min(100%, 820px); margin: 0 auto; padding: 104px 24px 160px;
+      flex: 1; overflow-y: auto;
+    }
+    .welcome { margin: 15vh auto 0; text-align: center; }
+    .welcome h2 { font-size: clamp(26px, 4vw, 36px); font-weight: 550; margin-bottom: 10px; }
+    .welcome p { color: #aaa; }
+    .message { display: flex; gap: 14px; margin: 22px 0; line-height: 1.65; }
+    .avatar {
+      flex: 0 0 48px; min-height: 32px; display: grid; place-items: center;
+      padding: 0 5px; border-radius: 10px; background: #343434;
+      font-size: 11px; font-weight: 700; letter-spacing: .02em;
+    }
+    .message.assistant .avatar { background: #10a37f; }
+    .message-content { white-space: pre-wrap; overflow-wrap: anywhere; padding-top: 2px; }
+    .message-content.error { color: #ffb4a9; }
+    .composer-wrap {
+      position: fixed; bottom: 0; left: 260px; right: 0; padding: 20px 24px 12px;
+      background: linear-gradient(transparent, #212121 18%);
+    }
+    .composer { max-width: 770px; margin: 0 auto; }
+    .input-box {
+      display: flex; align-items: flex-end; gap: 12px; padding: 11px 12px;
+      background: #2f2f2f; border: 1px solid #555; border-radius: 18px;
+      box-shadow: 0 8px 30px #0003;
+    }
+    textarea {
+      flex: 1; max-height: 180px; resize: none; border: 0; outline: 0;
+      color: #ececec; background: transparent; line-height: 1.5; padding: 5px 2px;
+    }
+    textarea::placeholder { color: #aaa; }
+    #send {
+      width: 36px; height: 36px; border: 0; border-radius: 50%;
+      background: #ececec; color: #222; font-size: 19px;
+    }
+    #send:disabled { opacity: .45; cursor: wait; }
+    .disclaimer { text-align: center; color: #999; font-size: 11px; padding-top: 10px; }
+    .toast { min-height: 20px; color: #ffb4a9; font-size: 13px; padding: 5px 8px; }
+    @media (max-width: 700px) {
+      .sidebar { display: none; }
+      main { margin-left: 0; }
+      .composer-wrap { left: 0; padding-inline: 12px; }
+      .floating-ui { top: 8px; left: 8px; right: 8px; }
+      .brand { gap: 8px; padding-right: 10px; }
+      .mascot-bar { top: 8px; }
+      .robot-sprite-frame { width: 64px; height: 46px; flex-basis: 64px; }
+      .robot-state { display: none; }
+      .floating-controls { top: 70px; right: 8px; gap: 5px; padding: 5px; }
+      .tools-button { padding: 8px; }
+      .tools-label, .floating-controls .sidebar-label { display: none; }
+      .model-select { min-width: 138px; max-width: 138px; }
+      #messages { padding: 120px 15px 160px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="floating-ui">
+    <div class="brand mascot-bar" id="mascot" role="status" aria-live="polite">
+      <div class="robot-sprite-frame">
+        <img class="robot-sprite" id="robot-sprite"
+             src="{{ url_for('static', filename='Nexo_reposo.png') }}"
+             alt="Robot NEXO en reposo">
+      </div>
+      <div class="robot-status">
+        <span class="robot-name">NEXO</span>
+        <span class="robot-state" id="robot-state">Listo para ayudarte</span>
+      </div>
+    </div>
+    <div class="floating-controls">
+      <button class="tools-button" id="show-tools" type="button" aria-label="Herramientas">
+        🔧 <span class="tools-label">Herramientas</span>
+      </button>
+      <div class="model-picker" id="model-picker">
+        <span class="sidebar-label" id="model-label-title">Modelo</span>
+        <button class="model-select" id="model-picker-toggle" type="button"
+                aria-labelledby="model-label-title model-current-label"
+                aria-haspopup="listbox" aria-expanded="false"
+                aria-controls="model-options">
+          <span class="model-select-label" id="model-current-label">NEXO · Reglas</span>
+          <span class="model-chevron" aria-hidden="true">▾</span>
+        </button>
+        <div class="model-options" id="model-options" role="listbox"
+             aria-labelledby="model-label-title" hidden>
+          <div class="model-option" role="option" tabindex="-1" data-model="reglas" aria-selected="true">NEXO · Reglas</div>
+          <div class="model-option" role="option" tabindex="-1" data-model="llm" aria-selected="false">NEXO · LLM</div>
+          <div class="model-option" role="option" tabindex="-1" data-model="eco" aria-selected="false">Modelo Eco</div>
+        </div>
+        <select class="model-native" id="model" aria-hidden="true" tabindex="-1">
+          <option value="reglas">NEXO · Reglas</option>
+          <option value="llm">NEXO · LLM</option>
+          <option value="eco">Modelo Eco</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  <aside class="sidebar">
+    <button class="new-chat" id="new-chat">＋ &nbsp; Nuevo chat</button>
+    <div class="sidebar-label">Conversaciones</div>
+    <nav class="conversation-list" id="conversation-list" aria-label="Conversaciones guardadas">
+      <div class="conversation-empty">Cargando...</div>
+    </nav>
+    <div class="sidebar-note">NEXO · Asistente de TechNova<br><br>El modelo Reglas responde a funciones básicas. Selecciona LLM para preguntas abiertas y respuestas con contexto de NEXO.<br><br>Las conversaciones se mantienen mientras el servidor está activo.</div>
+  </aside>
+  <main>
+    <dialog id="tools-dialog" aria-labelledby="tools-title">
+      <div class="tools-dialog-header">
+        <h2 id="tools-title">Herramientas de NEXO</h2>
+        <button class="close-dialog" id="close-tools" type="button" aria-label="Cerrar">×</button>
+      </div>
+      <ul id="tools-list"></ul>
+    </dialog>
+    <section id="messages" aria-live="polite">
+      <div class="welcome" id="welcome">
+        <h2>¿En qué puedo ayudarte?</h2>
+        <p>Pregunta algo para empezar una conversación con NEXO.</p>
+      </div>
+    </section>
+    <div class="composer-wrap">
+      <div class="composer">
+        <div class="toast" id="toast" role="status"></div>
+        <form class="input-box" id="form">
+          <textarea id="input" rows="1" placeholder="Escribe un mensaje..." aria-label="Mensaje"></textarea>
+          <button id="send" type="submit" aria-label="Enviar mensaje">↑</button>
+        </form>
+        <div class="disclaimer">NEXO puede cometer errores. Comprueba la información importante.</div>
+      </div>
+    </div>
+  </main>
+  <script>
+    const messages = document.querySelector("#messages");
+    const welcome = document.querySelector("#welcome");
+    const form = document.querySelector("#form");
+    const input = document.querySelector("#input");
+    const send = document.querySelector("#send");
+    const toast = document.querySelector("#toast");
+    const model = document.querySelector("#model");
+    const modelPicker = document.querySelector("#model-picker");
+    const modelPickerToggle = document.querySelector("#model-picker-toggle");
+    const modelOptions = document.querySelector("#model-options");
+    const modelOptionItems = [...modelOptions.querySelectorAll(".model-option")];
+    const toolsDialog = document.querySelector("#tools-dialog");
+    const toolsList = document.querySelector("#tools-list");
+    const conversationList = document.querySelector("#conversation-list");
+    const mascot = document.querySelector("#mascot");
+    const robotState = document.querySelector("#robot-state");
+    const robotSprite = document.querySelector("#robot-sprite");
+    const robotSprites = {
+      ready: {{ url_for('static', filename='Nexo_reposo.png')|tojson }},
+      listening: {{ url_for('static', filename='Nexo_reposo.png')|tojson }},
+      thinking: {{ url_for('static', filename='Nexo_pensando.png')|tojson }},
+      speaking: {{ url_for('static', filename='Nexos_respondiendo.png')|tojson }},
+      done: {{ url_for('static', filename='Nexo_terminado.png')|tojson }},
+      error: {{ url_for('static', filename='Nexo_terminado.png')|tojson }}
+    };
+    let robotResetTimeout;
+
+    function syncModelPicker() {
+      const selectedModel = [...model.options].find(option => option.value === model.value);
+      if (!selectedModel) throw new Error(`Modelo no reconocido: ${model.value}`);
+      modelPickerToggle.querySelector(".model-select-label").textContent = selectedModel.textContent;
+      for (const option of modelOptionItems) {
+        option.setAttribute("aria-selected", String(option.dataset.model === model.value));
+      }
+    }
+
+    function closeModelOptions(returnFocus = false) {
+      modelOptions.hidden = true;
+      modelPickerToggle.setAttribute("aria-expanded", "false");
+      if (returnFocus) modelPickerToggle.focus();
+    }
+
+    function openModelOptions() {
+      modelOptions.hidden = false;
+      modelPickerToggle.setAttribute("aria-expanded", "true");
+      const selected = modelOptionItems.find(option => option.dataset.model === model.value);
+      (selected || modelOptionItems[0]).focus();
+    }
+
+    syncModelPicker();
+    modelPickerToggle.addEventListener("click", () => {
+      if (modelOptions.hidden) openModelOptions();
+      else closeModelOptions();
+    });
+    modelOptions.addEventListener("click", event => {
+      const option = event.target.closest(".model-option");
+      if (!option) return;
+      model.value = option.dataset.model;
+      syncModelPicker();
+      closeModelOptions(true);
+      model.dispatchEvent(new Event("change", {bubbles: true}));
+    });
+    modelPicker.addEventListener("keydown", event => {
+      if (modelOptions.hidden) {
+        if (event.target === modelPickerToggle && ["ArrowDown", "ArrowUp"].includes(event.key)) {
+          event.preventDefault();
+          openModelOptions();
+        }
+        return;
+      }
+
+      const currentIndex = modelOptionItems.indexOf(document.activeElement);
+      let nextIndex = currentIndex;
+      if (event.key === "ArrowDown") nextIndex = (currentIndex + 1) % modelOptionItems.length;
+      else if (event.key === "ArrowUp") nextIndex = (currentIndex - 1 + modelOptionItems.length) % modelOptionItems.length;
+      else if (event.key === "Home") nextIndex = 0;
+      else if (event.key === "End") nextIndex = modelOptionItems.length - 1;
+      else if (event.key === "Escape") {
+        event.preventDefault();
+        closeModelOptions(true);
+        return;
+      } else if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        document.activeElement.click();
+        return;
+      } else {
+        return;
+      }
+
+      event.preventDefault();
+      modelOptionItems[nextIndex].focus();
+    });
+    modelPicker.addEventListener("focusout", event => {
+      if (!modelPicker.contains(event.relatedTarget)) closeModelOptions();
+    });
+    document.addEventListener("pointerdown", event => {
+      if (!modelPicker.contains(event.target)) closeModelOptions();
+    });
+
+    function setRobotState(state, label) {
+      mascot.classList.toggle("is-active", state === "thinking" || state === "speaking");
+      robotSprite.src = robotSprites[state] || robotSprites.ready;
+      robotSprite.alt = `Robot NEXO: ${label}`;
+      robotState.textContent = label;
+    }
+
+    function addMessage(role, text = "") {
+      welcome.hidden = true;
+      const row = document.createElement("article");
+      row.className = `message ${role}`;
+      const avatar = document.createElement("div");
+      avatar.className = "avatar";
+      avatar.textContent = role === "user" ? "TÚ" : "NEXO";
+      const content = document.createElement("div");
+      content.className = "message-content";
+      content.textContent = text;
+      row.append(avatar, content);
+      messages.append(row);
+      messages.scrollTop = messages.scrollHeight;
+      return content;
+    }
+
+    async function loadHistory() {
+      const response = await fetch("/api/historial");
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo cargar el historial.");
+      messages.querySelectorAll(".message").forEach(message => message.remove());
+      welcome.hidden = data.messages.length > 0;
+      for (const message of data.messages) addMessage(message.role, message.content);
+    }
+
+    async function deleteConversation(id, title) {
+      if (!window.confirm(`¿Eliminar la conversación "${title}"? Esta acción no se puede deshacer.`)) {
+        return;
+      }
+
+      toast.textContent = "";
+      try {
+        const response = await fetch(`/api/conversaciones/${encodeURIComponent(id)}`, {
+          method: "DELETE"
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "No se pudo eliminar la conversación.");
+        if (data.active) {
+          await loadHistory();
+          setRobotState("ready", "Listo para ayudarte");
+        }
+        await refreshConversationList();
+        toast.textContent = "Conversación eliminada.";
+      } catch (error) {
+        toast.textContent = error.message;
+      }
+    }
+
+    async function refreshConversationList() {
+      const response = await fetch("/api/conversaciones");
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudieron cargar los chats.");
+      conversationList.replaceChildren();
+      if (data.conversations.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "conversation-empty";
+        empty.textContent = "Aún no hay chats guardados.";
+        conversationList.append(empty);
+        return;
+      }
+      for (const conversation of data.conversations) {
+        const entry = document.createElement("div");
+        entry.className = "conversation-entry";
+        const button = document.createElement("button");
+        button.className = `conversation-item${conversation.active ? " active" : ""}`;
+        button.type = "button";
+        button.textContent = conversation.title;
+        button.title = conversation.title;
+        button.addEventListener("click", () => openConversation(conversation.id));
+        const deleteButton = document.createElement("button");
+        deleteButton.className = "conversation-delete";
+        deleteButton.type = "button";
+        deleteButton.textContent = "🗑";
+        deleteButton.title = "Eliminar conversación";
+        deleteButton.setAttribute("aria-label", `Eliminar conversación: ${conversation.title}`);
+        deleteButton.addEventListener("click", () => {
+          deleteConversation(conversation.id, conversation.title);
+        });
+        entry.append(button, deleteButton);
+        conversationList.append(entry);
+      }
+    }
+
+    async function openConversation(id) {
+      toast.textContent = "";
+      try {
+        const response = await fetch(`/api/conversaciones/${encodeURIComponent(id)}`, {
+          method: "POST"
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "No se pudo abrir el chat.");
+        await loadHistory();
+        await refreshConversationList();
+      } catch (error) {
+        toast.textContent = error.message;
+      }
+    }
+
+    document.querySelector("#show-tools").addEventListener("click", async () => {
+      toolsList.replaceChildren();
+      const loading = document.createElement("li");
+      loading.className = "tools-empty";
+      loading.textContent = "Cargando herramientas...";
+      toolsList.append(loading);
+      toolsDialog.showModal();
+      try {
+        const response = await fetch("/api/herramientas");
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "No se pudieron cargar las herramientas.");
+        toolsList.replaceChildren();
+        if (data.tools.length === 0) {
+          const empty = document.createElement("li");
+          empty.className = "tools-empty";
+          empty.textContent = "No hay herramientas disponibles.";
+          toolsList.append(empty);
+        } else {
+          for (const tool of data.tools) {
+            const item = document.createElement("li");
+            item.textContent = tool;
+            toolsList.append(item);
+          }
+        }
+      } catch (error) {
+        toolsList.replaceChildren();
+        const failure = document.createElement("li");
+        failure.className = "tools-empty";
+        failure.textContent = error.message;
+        toolsList.append(failure);
+      }
+    });
+
+    document.querySelector("#close-tools").addEventListener("click", () => toolsDialog.close());
+    toolsDialog.addEventListener("click", event => {
+      if (event.target === toolsDialog) toolsDialog.close();
+    });
+
+    model.addEventListener("change", async () => {
+      syncModelPicker();
+      toast.textContent = "";
+      try {
+        const response = await fetch("/api/modelo", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({name: model.value})
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "No se pudo cambiar el modelo.");
+        toast.textContent = `Modelo activo: ${data.label}`;
+      } catch (error) {
+        toast.textContent = error.message;
+        model.value = "reglas";
+        syncModelPicker();
+      }
+    });
+
+    document.querySelector("#new-chat").addEventListener("click", async () => {
+      const response = await fetch("/api/nueva", {method: "POST"});
+      if (!response.ok) {
+        const data = await response.json();
+        toast.textContent = data.error || "No se pudo iniciar un chat nuevo.";
+        return;
+      }
+      messages.querySelectorAll(".message").forEach(message => message.remove());
+      welcome.hidden = false;
+      toast.textContent = "";
+      await refreshConversationList();
+      input.focus();
+    });
+
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      const question = input.value.trim();
+      if (!question || send.disabled) return;
+      window.clearTimeout(robotResetTimeout);
+      toast.textContent = "";
+      setRobotState("thinking", "Estoy preparando una respuesta...");
+      addMessage("user", question);
+      const answer = addMessage("assistant");
+      input.value = "";
+      input.style.height = "auto";
+      send.disabled = true;
+      try {
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({message: question})
+        });
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || "No se pudo enviar el mensaje.");
+        }
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let receivedText = "";
+        while (true) {
+          const {value, done} = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, {stream: true});
+          const events = buffer.split("\n\n");
+          buffer = events.pop();
+          for (const event of events) {
+            const line = event.split("\n").find(part => part.startsWith("data: "));
+            if (!line) continue;
+            const data = JSON.parse(line.slice(6));
+            if (data.type === "chunk") {
+              setRobotState("speaking", "NEXO está hablando...");
+              receivedText += data.text;
+              answer.textContent = receivedText;
+              messages.scrollTop = messages.scrollHeight;
+            } else if (data.type === "done") {
+              if (!receivedText) setRobotState("speaking", "NEXO está respondiendo...");
+              if (!receivedText) answer.textContent = data.text;
+              await refreshConversationList();
+            } else if (data.type === "error") {
+              throw new Error(data.message);
+            }
+          }
+        }
+      } catch (error) {
+        setRobotState("error", "No se pudo completar la respuesta");
+        answer.textContent = answer.textContent
+          ? `${answer.textContent}\n\nError: ${error.message}`
+          : `No se pudo completar la respuesta.\n\n${error.message}`;
+        answer.classList.add("error");
+        toast.textContent = error.message;
+      } finally {
+        send.disabled = false;
+        if (!answer.classList.contains("error")) {
+          setRobotState("done", "Respuesta completada");
+          robotResetTimeout = window.setTimeout(
+            () => setRobotState("ready", "Listo para ayudarte"),
+            1400
+          );
+        }
+        input.focus();
+      }
+    });
+
+    input.addEventListener("input", () => {
+      setRobotState("listening", "Te estoy escuchando");
+      input.style.height = "auto";
+      input.style.height = `${Math.min(input.scrollHeight, 180)}px`;
+    });
+    input.addEventListener("keydown", event => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        form.requestSubmit();
+      }
+    });
+    Promise.all([loadHistory(), refreshConversationList()])
+      .catch(error => { toast.textContent = error.message; });
+  </script>
+</body>
+</html>
